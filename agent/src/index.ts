@@ -94,13 +94,23 @@ server.tool(
     question: z.string().describe("weatherlibライブラリの実装方法、仕様、トラブルシューティングに関する質問") 
   },
   async ({ question }) => {
+    // [Server Log] ターミナルに受信ログを表示 (stderrに出すことで通信を邪魔しない)
+    console.error(`\n🔍 [Request Received] Question: "${question}"`);
+    console.error("   Thinking...");
+
     try {
       const answer = await ragChain.invoke(question);
+      
+      console.error("✅ [Response Ready]");
+      
+      // [Client Response] 挨拶を付与して返却
+      const formattedAnswer = `🤖 **WeatherLib Agent**\n\n${answer}`;
+
       return {
-        content: [{ type: "text", text: answer }],
+        content: [{ type: "text", text: formattedAnswer }],
       };
     } catch (error) {
-      console.error("RAG Chain Error:", error);
+      console.error("❌ [Error]", error);
       return {
         content: [{ type: "text", text: "申し訳ありません。回答の生成中にエラーが発生しました。" }],
         isError: true,
