@@ -33,9 +33,9 @@ const vectorStore = new LanceDB(embeddings, { table });
 const retriever = vectorStore.asRetriever(6);
 
 // Model: ローカルLLM (Ollama) を使用
-// 事前に `ollama pull llama3` (または任意のモデル) を実行しておいてください
+// 事前に `ollama pull gemma3` (または任意のモデル) を実行しておいてください
 const model = new ChatOllama({
-  model: "llama3", // 必要に応じて "mistral", "gemma2" などに変更してください
+  model: "gemma3", // 推奨: gemma3
   temperature: 0,
 });
 
