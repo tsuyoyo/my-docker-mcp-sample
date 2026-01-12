@@ -40,8 +40,6 @@ jobs:
         run: npm ci
 
       - name: Ingest Knowledge (Learn Code & Docs)
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         # 親ディレクトリのGoコードなどを読み込んで agent/data を生成
         run: npm run ingest
 
