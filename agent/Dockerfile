@@ -3,7 +3,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 COPY src ./src
 RUN npm run build
 
@@ -11,7 +11,7 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --only=production --legacy-peer-deps
 COPY --from=builder /app/dist ./dist
 
 # ★重要: CI/CDで生成された「dataディレクトリ（学習済みDB）」をコピーする

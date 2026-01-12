@@ -33,9 +33,9 @@ const vectorStore = new LanceDB(embeddings, { table });
 const retriever = vectorStore.asRetriever(6);
 
 // Model: ローカルLLM (Ollama) を使用
-// 事前に `ollama pull gemma3` (または任意のモデル) を実行しておいてください
 const model = new ChatOllama({
-  model: "gemma3", // 推奨: gemma3
+  baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434", // Dockerからは http://host.docker.internal:11434 を指定
+  model: "gemma3", 
   temperature: 0,
 });
 
