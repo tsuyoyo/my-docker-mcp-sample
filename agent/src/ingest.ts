@@ -1,4 +1,4 @@
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { DirectoryLoader } from "langchain/document_loaders/fs/directory";
 import { TextLoader } from "langchain/document_loaders/fs/text";
@@ -99,13 +99,18 @@ async function run() {
   // 直接テーブルを作成して渡す
   const table = await db.createTable(
     "vectors",
-    [{ vector: Array(1536).fill(0), text: "placeholder", source: "placeholder" }],
+    [{ vector: Array(384).fill(0), text: "placeholder", source: "placeholder" }],
     { mode: "overwrite" }
   );
+  
+  // ローカルモデルを使用 (Xenova/all-MiniLM-L6-v2)
+  const embeddings = new HuggingFaceTransformersEmbeddings({
+    modelName: "Xenova/all-MiniLM-L6-v2",
+  });
 
   await LanceDB.fromDocuments(
     splitDocs,
-    new OpenAIEmbeddings(),
+    embeddings,
     { table }
   );
 

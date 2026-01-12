@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { ChatOpenAI } from "@langchain/openai";
+import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
 import { LanceDB } from "@langchain/community/vectorstores/lancedb";
 import { connect } from "@lancedb/lancedb";
 import { StringOutputParser } from "@langchain/core/output_parsers";
@@ -20,7 +21,13 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.join(__dirname, "../data/lancedb");
 const db = await connect(dbPath);
 const table = await db.openTable("vectors");
-const vectorStore = new LanceDB(new OpenAIEmbeddings(), { table });
+
+// ローカルモデルを使用 (Ingest側と合わせる必須あり)
+const embeddings = new HuggingFaceTransformersEmbeddings({
+  modelName: "Xenova/all-MiniLM-L6-v2",
+});
+
+const vectorStore = new LanceDB(embeddings, { table });
 
 // Retriever: 検索結果数を少し多めに取得 (Context Windowが許す限り情報を入れたい)
 const retriever = vectorStore.asRetriever(6);
