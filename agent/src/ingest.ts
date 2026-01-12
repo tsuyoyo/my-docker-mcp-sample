@@ -108,6 +108,21 @@ async function run() {
     modelName: "Xenova/all-MiniLM-L6-v2",
   });
 
+  // 4. メタデータのクレンジング (LanceDB対策)
+  // ネストされたオブジェクト(loc)などはDB保存時にエラーになるため削除または文字列化する
+  splitDocs.forEach((doc) => {
+    // 不要な loc (行番号情報) を削除
+    if (doc.metadata.loc) {
+      delete doc.metadata.loc;
+    }
+    // その他、値がオブジェクトになっているものはJSON文字列化
+    for (const key in doc.metadata) {
+      if (typeof doc.metadata[key] === 'object' && doc.metadata[key] !== null) {
+         doc.metadata[key] = JSON.stringify(doc.metadata[key]);
+      }
+    }
+  });
+
   await LanceDB.fromDocuments(
     splitDocs,
     embeddings,

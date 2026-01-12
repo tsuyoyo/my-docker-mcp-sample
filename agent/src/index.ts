@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatOllama } from "@langchain/ollama";
 import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
 import { LanceDB } from "@langchain/community/vectorstores/lancedb";
 import { connect } from "@lancedb/lancedb";
@@ -32,10 +32,11 @@ const vectorStore = new LanceDB(embeddings, { table });
 // Retriever: 検索結果数を少し多めに取得 (Context Windowが許す限り情報を入れたい)
 const retriever = vectorStore.asRetriever(6);
 
-// Model: コード生成に強いモデル、かつ temperature=0 で決定論的に
-const model = new ChatOpenAI({ 
-  modelName: "gpt-4o", 
-  temperature: 0 
+// Model: ローカルLLM (Ollama) を使用
+// 事前に `ollama pull llama3` (または任意のモデル) を実行しておいてください
+const model = new ChatOllama({
+  model: "llama3", // 必要に応じて "mistral", "gemma2" などに変更してください
+  temperature: 0,
 });
 
 // Prompt: Roleを明確に分けたチャットプロンプトテンプレート
