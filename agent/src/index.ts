@@ -5,45 +5,67 @@ import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { LanceDB } from "@langchain/community/vectorstores/lancedb";
 import { connect } from "@lancedb/lancedb";
 import { StringOutputParser } from "@langchain/core/output_parsers";
-import { PromptTemplate } from "@langchain/core/prompts";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence, RunnablePassthrough } from "@langchain/core/runnables";
-import { formatDocumentsAsString } from "langchain/util/document";
+import { Document } from "@langchain/core/documents";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- RAG Setup ---
+// --- 1. RAG Setup (Modern Approach) ---
+
+// DB接続
 const dbPath = path.join(__dirname, "../data/lancedb");
 const db = await connect(dbPath);
 const table = await db.openTable("vectors");
 const vectorStore = new LanceDB(new OpenAIEmbeddings(), { table });
 
-const retriever = vectorStore.asRetriever(4);
-const model = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0 });
+// Retriever: 検索結果数を少し多めに取得 (Context Windowが許す限り情報を入れたい)
+const retriever = vectorStore.asRetriever(6);
 
-const prompt = PromptTemplate.fromTemplate(`
-あなたはGoライブラリ "weatherlib" の専任サポートエンジニアです。
-以下の「ソースコード」および「ドキュメント」に基づいて、ユーザーの質問に回答してください。
+// Model: コード生成に強いモデル、かつ temperature=0 で決定論的に
+const model = new ChatOpenAI({ 
+  modelName: "gpt-4o", 
+  temperature: 0 
+});
 
-特に以下の点に注意してください：
-- コードのバージョンや仕様変更（v2.0など）に敏感であること。
-- 型定義や関数シグネチャに基づいた正確なGo言語のサンプルコードを提示すること。
-- 情報がない場合は正直にそう伝えること。
+// Prompt: Roleを明確に分けたチャットプロンプトテンプレート
+const prompt = ChatPromptTemplate.fromMessages([
+  ["system", `あなたはGo言語ライブラリ "weatherlib" の専任テクニカルサポートエージェントです。
+提供されたコンテキスト（ソースコードやドキュメント）のみに基づいて、正確に回答してください。
+
+以下のガイドラインを厳守してください：
+1. **正確性**: 提供されたコードの関数名、引数、戻り値を正確に使用してください。存在しない関数を捏造しないでください。
+2. **バージョン対応**: "v2.0" などの仕様変更に関する記述がある場合は、最新の仕様に従ってください。
+3. **出典の明示**: 回答の根拠となるファイル名（例: README.md, weather.go）がコンテキストに含まれている場合、可能な限り言及してください。
+4. **正直さ**: コンテキストに情報がない場合は、「提供された情報内には見当たりません」と正直に答えてください。
+`],
+  ["human", `以下のコンテキスト情報を参照して、質問に答えてください。
 
 【コンテキスト】
 {context}
 
 【質問】
-{question}
+{question}`],
+]);
 
-回答:
-`);
+// Helper: ドキュメントを文字列化する際に、ファイル名(source)を含める
+const formatDocumentsWithSource = (docs: Document[]): string => {
+  return docs
+    .map((doc) => {
+      const source = doc.metadata.source || "unknown";
+      const content = doc.pageContent;
+      return `--- [File: ${source}] ---\n${content}\n`;
+    })
+    .join("\n");
+};
 
+// LCEL Chain: Retrieval QA Chain
 const ragChain = RunnableSequence.from([
   {
-    context: retriever.pipe(formatDocumentsAsString),
+    context: retriever.pipe(formatDocumentsWithSource),
     question: new RunnablePassthrough(),
   },
   prompt,
@@ -51,7 +73,8 @@ const ragChain = RunnableSequence.from([
   new StringOutputParser(),
 ]);
 
-// --- MCP Server Setup ---
+// --- 2. MCP Server Setup ---
+
 const server = new McpServer({
   name: "weatherlib-agent",
   version: "1.0.0",
@@ -59,12 +82,22 @@ const server = new McpServer({
 
 server.tool(
   "ask_weatherlib",
-  { question: z.string().describe("weatherlibの使い方や仕様に関する質問") },
+  { 
+    question: z.string().describe("weatherlibライブラリの実装方法、仕様、トラブルシューティングに関する質問") 
+  },
   async ({ question }) => {
-    const answer = await ragChain.invoke(question);
-    return {
-      content: [{ type: "text", text: answer }],
-    };
+    try {
+      const answer = await ragChain.invoke(question);
+      return {
+        content: [{ type: "text", text: answer }],
+      };
+    } catch (error) {
+      console.error("RAG Chain Error:", error);
+      return {
+        content: [{ type: "text", text: "申し訳ありません。回答の生成中にエラーが発生しました。" }],
+        isError: true,
+      };
+    }
   }
 );
 
